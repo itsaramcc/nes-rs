@@ -1,6 +1,20 @@
-use super::opcodes::*;
+//
+// 6502 Instruction Set:
+//	https://www.masswerk.at/6502/6502_instruction_set.html
+//	http://www.6502.org/tutorials/6502opcodes.html
+//
+// 6502 Programming Manual:
+//	http://archive.6502.org/datasheets/synertek_programming_manual.pdf
+//  https://www.nesdev.org/NESDoc.pdf
+//
+// 6502 Guide:
+//	https://www.nesdev.org/obelisk-6502-guide/index.html
 
 
+mod opcodes;
+use opcodes::*;
+
+// 6502 Processor
 pub struct Cpu {
 	pub opcode: u8,
 
@@ -16,9 +30,11 @@ pub struct Cpu {
 	pub addr_abs: u16,
 	pub addr_rel: u16,
 	pub fetched: u8,
+
+	pub cycles: u8,
+	pub global_clock: u128,
 }
 
-// 6502 CPU
 impl Cpu {
 
 	pub fn init() -> Self {
@@ -36,15 +52,27 @@ impl Cpu {
 			addr_abs: 0,
 			addr_rel: 0,
 			fetched: 0,
+
+			cycles: 0,
+			global_clock: 0
 		}
 	}
 
 	pub fn cycle(&mut self) {
+		self.global_clock += 1;
+		if self.cycles != 0 {
+			self.cycles -= 1;
+			return;
+		}
+
 		self.opcode = self.mem[self.pc as usize];
 		self.pc += 1;
 
-		(LOOK_UP[self.opcode as usize].address_mode)(self);
-		(LOOK_UP[self.opcode as usize].instruction)(self);
+		self.cycles = LOOK_UP[self.opcode as usize].cycles;
+		let extra_cycles1 = (LOOK_UP[self.opcode as usize].address_mode)(self);
+		let extra_cycles2 = (LOOK_UP[self.opcode as usize].instruction)(self);
+
+		self.cycles += extra_cycles1 & extra_cycles2;
 	}
 
 	pub fn fetch(&mut self) -> u8 {
